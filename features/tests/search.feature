@@ -24,4 +24,3 @@ Feature: Tests for Target search functionality
     |iphone   |iphone           |
     |coffee   |coffee           |
     |tea      |tea              |
-
