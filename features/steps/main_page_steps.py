@@ -1,6 +1,4 @@
-from selenium.webdriver.common.by import By
-from behave import given, when, then
-from time import sleep
+from behave import given
 
 
 @given('Open target main page')
