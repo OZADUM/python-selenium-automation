@@ -4,3 +4,4 @@ Feature: Tests for Target search functionality
     Given Open target main page
     When Search for a product
     Then Verify search results are shown
+
