@@ -1,6 +1,7 @@
-# Created by OzanDuman at 9/24/25
-Feature: # Enter feature name here
-  # Enter feature description here
+Feature: Target Sign In navigation
 
-  Scenario: # Enter scenario name here
-    # Enter steps here
+  Scenario: Logged out user can navigate to Sign In
+    Given Open target main page
+    When Click Sign In
+    And From right side navigation menu, click Sign In
+    Then Verify Sign In form opened
