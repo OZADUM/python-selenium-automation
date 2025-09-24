@@ -5,3 +5,7 @@ Feature: Tests for Target search functionality
     When Search for a product
     Then Verify search results are shown
 
+Scenario: 'Your cart is empty' message is shown for empty cart
+    Given Open target main page
+    When Click on Cart icon
+    Then Verify 'Your cart is empty' message is shown
