@@ -59,3 +59,13 @@ def verify_products_name_img(context):
         assert title, 'Product title not shown'
         print(f'🟢{title}')
         product.find_element(*PRODUCT_IMG)
+
+
+@when('Hover favorites icon')
+def hover_fav_icon(context):
+    context.app.search_results_page.hover_fav_icon()
+
+
+@then('Favorites tooltip is shown')
+def verify_fav_tt_shown(context):
+    context.app.search_results_page.verify_fav_tt_shown()
