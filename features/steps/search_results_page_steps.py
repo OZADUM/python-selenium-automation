@@ -34,5 +34,8 @@ def side_nav_click_add_to_cart(context):
     context.driver.find_element(*SIDE_NAV_ADD_TO_CART_BTN).click()
     sleep(5)
 
+
 @then('Verify search results are shown for {product}')
 def verify_search_results(context, product):
+    actual_text = context.driver.find_element(*SEARCH_RESULTS_TXT).text
+    assert product in actual_text, f'Error. Expected text {product} but got {actual_text}'

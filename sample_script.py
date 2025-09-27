@@ -13,7 +13,8 @@ driver.wait = WebDriverWait(driver, 10)
 
 # open the url
 driver.get('https://www.google.com/')
- @@ -20,11 +19,13 @@
+# populate search field
+search = driver.find_element(By.NAME, 'q')
 search.clear()
 search.send_keys('Car')
 
@@ -27,3 +28,5 @@ driver.wait.until(
 
 # verify search results
 assert 'car'.lower() in driver.current_url.lower(), f"Expected query not in {driver.current_url.lower()}"
+print('Test Passed')
+driver.quit()
