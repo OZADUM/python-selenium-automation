@@ -1,6 +1,5 @@
-# Created by OzanDuman at 9/29/25
-Feature: # Enter feature name here
-  # Enter feature description here
-
-  Scenario: # Enter scenario name here
-    # Enter steps here
+Feature: Cart (HW5)
+  Scenario: 'Your cart is empty' message is shown
+    Given Open Target home (HW5)
+    When Click Cart icon (HW5)
+    Then Verify 'Your cart is empty' message is shown (HW5)
