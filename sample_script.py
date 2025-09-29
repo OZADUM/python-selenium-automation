@@ -13,6 +13,7 @@ driver.wait = WebDriverWait(driver, 10)
 
 # open the url
 driver.get('https://www.google.com/')
+
 # populate search field
 search = driver.find_element(By.NAME, 'q')
 search.clear()
