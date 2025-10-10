@@ -1,32 +1,26 @@
-from selenium.webdriver.common.by import By
-from behave import given, when, then
-from time import sleep
+# features/steps/cart_page_steps.py
+from behave import when, then
 
-
-PRODUCT_NAME = (By.CSS_SELECTOR, "[data-test='cartItem-title']")
-TOTAL_TXT = (By.XPATH, "//div[./span[contains(text(), 'subtotal')]]")
-
+# --- Navigation ---
 
 @when('Open cart page')
 def open_cart(context):
-    context.driver.get('https://www.target.com/cart')
+    context.app.cart_page.open()
 
+# --- Assertions ---
 
 @then('Verify cart has correct product')
 def verify_product_name(context):
-    # context.product_name => stored before
-    product_name_in_cart = context.driver.find_element(*PRODUCT_NAME).text
-    print('Name in cart: ', product_name_in_cart)
+    assert hasattr(context, "product_name") and context.product_name.strip(), \
+        "No product_name stored in context (did you run the step that stores it?)."
+    expected = context.product_name.strip()
+    context.app.cart_page.verify_contains_product(expected)
 
-    assert context.product_name[:20] == product_name_in_cart[:20], \
-        f'Expected {context.product_name[:20]} did not match {product_name_in_cart[:20]}'
-
-
-@then('Verify cart has {amount} item(s)')
-def verify_cart_items(context, amount):
-    cart_summary = context.driver.find_element(*TOTAL_TXT).text
-    assert f'{amount} item' in cart_summary, f"Expected {amount} items but got {cart_summary}"
-
+@then('Verify cart has {expected:d} item(s)')
+def verify_cart_items(context, expected):
+    actual = context.app.cart_page.get_items_count()
+    print(f"DEBUG: expected={expected}, actual={actual}, url={context.driver.current_url}")
+    context.app.cart_page.verify_items_count(expected)
 
 @then("Verify 'Your cart is empty' message is shown")
 def verify_empty_cart_msg(context):
