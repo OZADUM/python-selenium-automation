@@ -1,111 +1,96 @@
+# features/steps/cart_page_steps.py
 from behave import when, then
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
 
 CART_URL = "https://www.target.com/cart"
 
-# --- Common cart markers (Target DOM can vary) ---
-CART_CONTENT = (By.CSS_SELECTOR, "[data-test='cartContent']")
-CART_EMPTY_MSG = (By.CSS_SELECTOR, "[data-test='boxEmptyMsg']")
-CART_ITEM = (By.CSS_SELECTOR, "[data-test='cartItem']")
-PRODUCT_TITLE = (By.CSS_SELECTOR, "[data-test='cartItem'] [data-test='cartItem-title']")
-
-# A few alternative/legacy hooks (kept loose on purpose)
-CART_ROOT_FALLBACKS = [
-    (By.CSS_SELECTOR, "#cart-root"),
-    (By.CSS_SELECTOR, "[data-test='cart']"),
-    (By.CSS_SELECTOR, "[data-test='cartItems']"),
-]
+EMPTY_MSG = (By.XPATH, "//*[contains(., \"Your cart is empty\")]")
+ITEM_COUNT_BADGE = (By.CSS_SELECTOR, '[data-test="itemCount"], [data-test="cartSummaryItemCount"]')
+CART_ITEM_TITLES = (By.CSS_SELECTOR, '[data-test="cartItem-title"], [data-test="product-title"]')
 
 
-def _wait(context, timeout=15):
-    return context.driver.wait if hasattr(context.driver, "wait") else WebDriverWait(context.driver, timeout)
-
-
-def _any_present(driver, locators):
-    for by, sel in locators:
-        els = driver.find_elements(by, sel)
-        if els:
-            return True
-    return False
-
-
-def _wait_for_cart_loaded(context, allow_refresh=True):
-    w = _wait(context, 15)
-
-    # 1) Ensure we're on /cart
-    w.until(lambda d: "/cart" in d.current_url.lower())
-
-    # 2) Accept any of these as "cart loaded"
-    primary_markers = [CART_CONTENT, CART_EMPTY_MSG, CART_ITEM, PRODUCT_TITLE]
-    fallback_markers = CART_ROOT_FALLBACKS
-
-    def cart_ready(d):
-        return _any_present(d, primary_markers) or _any_present(d, fallback_markers)
-
-    try:
-        w.until(cart_ready)
-    except Exception:
-        if allow_refresh:
-            # One-time refresh fallback (Target can be slow to hydrate the cart)
-            context.driver.refresh()
-            w.until(lambda d: "/cart" in d.current_url.lower())
-            w.until(cart_ready)
-        else:
-            raise
+def _wait(driver, timeout=15):
+    return WebDriverWait(driver, timeout)
 
 
 @when("Open cart page")
-def open_cart(context):
-    # Navigate directly to cart; side drawer from PDP shouldn't block a hard navigation
+def open_cart_page(context):
     context.driver.get(CART_URL)
-    _wait_for_cart_loaded(context, allow_refresh=True)
+    # wait for either empty message or cart content to load
+    wait = _wait(context.driver)
+    try:
+        wait.until(
+            EC.any_of(
+                EC.presence_of_element_located(EMPTY_MSG),
+                EC.presence_of_element_located(CART_ITEM_TITLES),
+            )
+        )
+    except Exception:
+        # not strictly fatal; let following steps assert specifics
+        pass
 
 
 @then("Verify 'Your cart is empty' message is shown")
 def verify_cart_empty_message(context):
-    w = _wait(context, 15)
-    # Either the explicit empty box or (rarely) a message container in the cart root
-    w.until(EC.presence_of_element_located(CART_EMPTY_MSG))
-    assert context.driver.find_element(*CART_EMPTY_MSG).is_displayed(), "Empty cart message is not visible"
+    _wait(context.driver).until(EC.visibility_of_element_located(EMPTY_MSG))
 
 
-@then("Verify cart has {qty:d} item(s)")
-def verify_cart_has_qty(context, qty):
-    _wait_for_cart_loaded(context, allow_refresh=False)
+@then("Verify cart has {expected:d} item(s)")
+def verify_cart_count(context, expected):
+    """
+    Be tolerant: either use an item count badge, or count visible cart item titles.
+    """
+    wait = _wait(context.driver)
+    count = None
 
-    # Give the DOM a brief chance to hydrate the line items
-    w = _wait(context, 10)
-    def count_items(d):
-        return len(d.find_elements(*CART_ITEM))
+    # First try a numeric badge
+    try:
+        badge = wait.until(EC.presence_of_element_located(ITEM_COUNT_BADGE))
+        txt = (badge.text or "").strip()
+        if txt.isdigit():
+            count = int(txt)
+    except Exception:
+        pass
 
-    # If we expect >0, wait until at least one appears (up to timeout)
-    if qty > 0:
+    # Fallback: count the titles
+    if count is None:
         try:
-            w.until(lambda d: count_items(d) >= 1)
+            titles = wait.until(EC.presence_of_all_elements_located(CART_ITEM_TITLES))
+            count = len([t for t in titles if (t.text or "").strip()])
         except Exception:
-            pass  # fall through to final count check
+            count = 0
 
-    actual = len(context.driver.find_elements(*CART_ITEM))
-    assert actual == qty, f"Expected {qty} items but got {actual}"
+    assert count == expected, f"Expected {expected} item(s) in cart, got {count}."
 
 
 @then("Verify cart has correct product")
-def verify_cart_product(context):
+def verify_cart_has_correct_product(context):
     """
-    Requires context.product_name to be set earlier (e.g., from side drawer):
-        context.product_name = driver.find_element(...).text
+    Compare the stored product name (from search results) with the titles in the cart.
+    Use a forgiving contains/substring match to account for slight differences.
     """
-    expected = (getattr(context, "product_name", "") or "").strip()
-    assert expected, "No product name stored in context.product_name"
+    expected_name = getattr(context, "stored_product_name", None) or getattr(context, "product_name", None)
+    assert expected_name, (
+        "No stored product name found (context.stored_product_name). "
+        "Make sure you ran the 'Store product name' step before this assertion."
+    )
 
-    _wait_for_cart_loaded(context, allow_refresh=False)
+    wait = _wait(context.driver)
+    titles = wait.until(EC.presence_of_all_elements_located(CART_ITEM_TITLES))
+    title_texts = [t.text.strip() for t in titles if (t.text or "").strip()]
 
-    w = _wait(context, 10)
-    w.until(EC.presence_of_all_elements_located(CART_ITEM))  # ensure at least one line item is present
+    # relaxed matching: exact, contains, or case-insensitive contains
+    exp = expected_name.strip()
+    exp_low = exp.lower()
 
-    titles = [el.text.strip() for el in context.driver.find_elements(*PRODUCT_TITLE)]
-    found = any(expected.lower() in t.lower() for t in titles)
+    match = any(
+        (exp == title) or (exp in title) or (exp_low in title.lower())
+        for title in title_texts
+    )
 
-    assert found, f"Expected product '{expected}' not found in cart titles: {titles}"
+    assert match, (
+        f"Expected product '{expected_name}' not found in cart titles: {title_texts}"
+    )
